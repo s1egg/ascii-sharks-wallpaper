@@ -20,8 +20,12 @@ if [ "$VERSION" != "$SOURCE_VERSION" ] || [ "$VERSION" != "$MANIFEST_VERSION" ] 
   exit 1
 fi
 PACKAGE_ID="dev.asciisharks.wallpaper.pkg"
-INSTALLER="$PROJECT_ROOT/dist/ASCII-Sharks-Wallpaper-$VERSION-arm64.pkg"
+RELEASE_DIR="$PROJECT_ROOT/dist/releases/$VERSION"
+mkdir -p "$PROJECT_ROOT/build" "$RELEASE_DIR"
+INSTALLER="$RELEASE_DIR/ASCII-Sharks-Wallpaper-$VERSION-arm64.pkg"
 WORK="$(mktemp -d "$PROJECT_ROOT/build/package.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+STAGED_INSTALLER="$WORK/$(basename "$INSTALLER")"
 mkdir -p "$WORK/root" "$WORK/packages"
 
 codesign --verify --deep --strict "$APP"
@@ -61,10 +65,10 @@ PY
 
 productbuild --distribution "$WORK/Distribution.xml" \
   --resources scripts/installer/resources --package-path "$WORK/packages" \
-  "$INSTALLER"
+  "$STAGED_INSTALLER"
 
 # Inspect the exact payload and its signature without installing on this Mac.
-pkgutil --expand-full "$INSTALLER" "$WORK/expanded"
+pkgutil --expand-full "$STAGED_INSTALLER" "$WORK/expanded"
 codesign --verify --deep --strict "$WORK/expanded/ASCIISharks.pkg/Payload/ASCII Sharks Wallpaper.app"
 /usr/bin/python3 - "$WORK/expanded" "$PACKAGE_ID" "$VERSION" <<'PY'
 from pathlib import Path
@@ -105,8 +109,10 @@ for file in ("welcome.html", "readme.html", "conclusion.html"):
 print("Installer verified: /Applications · arm64 · macOS 13+ · English and Chinese resources · no installation scripts")
 PY
 
+rm -f "$RELEASE_DIR/release.json" "$RELEASE_DIR/SHA256SUMS.txt"
+mv -f "$STAGED_INSTALLER" "$INSTALLER"
 (
-  cd "$PROJECT_ROOT/dist"
+  cd "$RELEASE_DIR"
   shasum -a 256 "ASCII-Sharks-Wallpaper-$VERSION-arm64.pkg" > "ASCII-Sharks-Wallpaper-$VERSION-arm64.pkg.sha256"
 )
 echo "Installer built: $INSTALLER"

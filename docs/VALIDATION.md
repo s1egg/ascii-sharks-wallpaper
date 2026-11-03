@@ -2,6 +2,8 @@
 
 Historical entries retain the application names, versions, and artifact paths used at the time. They describe the scope of each check, not a promise of compatibility with every supported deployment target.
 
+Evidence paths refer to local generated outputs, which may be cleaned after verification. Reproducible checks remain in `Tests/`; the retained release kit records its source commit and checksums in `release.json`.
+
 ## Recorded environment
 
 - Apple Silicon / arm64, macOS 26.5.2.
@@ -188,3 +190,12 @@ Evidence: `build/personality-browser-report.json`, `output/playwright/personalit
 - Rebuilt the arm64 ZIP and PKG as 0.1.2; package expansion, payload, localization, and signature checks passed.
 - Regenerated the README's MP4/GIF from the current sparse ocean and refreshed scene previews. Shared-memory capture on the tested installed Chrome corrupted the first two MP4 frames; ordinary PNG frame capture resolved it. The frame check then passed all 300 MP4 frames and 150 GIF frames with no missing Dock frames.
 - The post-commit release command records the exact commit/tree, toolchain, signing status, artifact hashes, and fresh verification results in `dist/releases/0.1.2/release.json`.
+
+## 2026-11-03: Release directory cleanup
+
+- Removed the unreferenced legacy `docs/assets/swimming.gif`; all current README media and its reproducible generation source remain.
+- Moved obsolete local builds, diagnostic captures, preview output, and regenerable media dependencies to a dedicated Trash backup. Preserved the current Web preview, original artwork archive, local settings backup, runnable app, and release source.
+- Consolidated ZIP, PKG, notes, and checksums in `dist/releases/<version>/`; installer staging now cleans itself up automatically.
+- Independent review identified and resolved two packaging edge cases: replacing an artifact invalidates old release provenance, and installer-only builds recreate a missing build directory.
+- Fresh simulation and native WebKit checks passed. Targeted packaging checks verified manifest invalidation, installer-only builds from a fixture without `build/`, and removal of temporary package staging.
+- GitHub publication uses a draft-first flow: upload the complete release kit, download and verify it, then publish and confirm the tag, latest-release pointer, and attachment set.

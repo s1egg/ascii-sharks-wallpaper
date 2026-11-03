@@ -47,10 +47,12 @@ fi
 RELEASE_DIR="$PROJECT_ROOT/dist/releases/$APP_VERSION"
 ZIP_NAME="ASCII-Sharks-Wallpaper-$APP_VERSION-arm64.zip"
 PKG_NAME="ASCII-Sharks-Wallpaper-$APP_VERSION-arm64.pkg"
-unzip -tq "$PROJECT_ROOT/dist/$ZIP_NAME"
-mkdir -p "$RELEASE_DIR"
+unzip -tq "$RELEASE_DIR/$ZIP_NAME"
 for artifact in "$ZIP_NAME" "$PKG_NAME" "$ZIP_NAME.sha256" "$PKG_NAME.sha256"; do
-  cp "$PROJECT_ROOT/dist/$artifact" "$RELEASE_DIR/$artifact"
+  if [ ! -s "$RELEASE_DIR/$artifact" ]; then
+    echo "Missing release artifact: $artifact" >&2
+    exit 1
+  fi
 done
 cp "docs/releases/$APP_VERSION.md" "$RELEASE_DIR/RELEASE_NOTES.md"
 cp "docs/releases/$APP_VERSION.zh-CN.md" "$RELEASE_DIR/RELEASE_NOTES.zh-CN.md"

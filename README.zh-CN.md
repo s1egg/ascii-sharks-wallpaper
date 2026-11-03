@@ -138,7 +138,7 @@ open "dist/ASCII Sharks Wallpaper.app"
 
 无需安装 npm 依赖。工具链准备好后，构建过程不需要下载第三方包。Bun 仅用于开发，构建好的应用可以独立运行。
 
-构建会在 `dist/` 中生成应用和 arm64 ZIP 压缩包。需要 PKG 安装包时执行：
+构建会在 `dist/` 中生成应用，并将 arm64 ZIP 压缩包放入 `dist/releases/<version>/`。需要在同一版本目录中生成 PKG 安装包时执行：
 
 ```sh
 bash scripts/package.sh

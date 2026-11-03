@@ -16,6 +16,7 @@
 - Reduced small-fish density to 24–64 animals by viewport area, with at most seven per school, wider spacing, weaker cohesion, and softer resting ink.
 - Updated the English and Simplified Chinese READMEs and scene previews.
 - Build artifacts derive their versioned names from application metadata; ZIP archives now include a checksum sidecar.
+- Distribution files share one versioned release directory, temporary installer staging is removed automatically, and the unused legacy animation has been removed.
 
 ### Fixed
 
@@ -24,6 +25,7 @@
 - Pausing or enabling Reduce Motion paints a clean static frame so transient pointer water marks do not remain frozen on screen.
 - Corner steering keeps the solo composition visible while retaining smooth turns and fixed segment lengths.
 - Packaging rejects an app whose version or build number differs from the source configuration.
+- Rebuilding a distribution artifact invalidates stale release provenance; installer-only builds also work after the temporary build directory has been cleaned.
 - App and icon assembly use empty staging directories so stale generated resources cannot leak into new release artifacts.
 - README video exports use ordinary PNG frame capture to avoid corrupted opening frames with the tested Chrome rendering path.
 

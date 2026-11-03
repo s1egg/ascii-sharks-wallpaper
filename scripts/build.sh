@@ -21,7 +21,8 @@ if [ "$APP_VERSION" != "$PLIST_VERSION" ]; then
   exit 1
 fi
 
-mkdir -p "$BUILD/Web" "$BUILD/ModuleCache" "$PROJECT_ROOT/dist"
+RELEASE_DIR="$PROJECT_ROOT/dist/releases/$APP_VERSION"
+mkdir -p "$BUILD/Web" "$BUILD/ModuleCache" "$RELEASE_DIR"
 STAGING_ROOT="$(mktemp -d "$BUILD/app.XXXXXX")"
 trap 'rm -rf "$STAGING_ROOT"' EXIT
 APP="$STAGING_ROOT/ASCII Sharks Wallpaper.app"
@@ -54,12 +55,14 @@ if ! mv "$APP" "$APP_DESTINATION"; then
   if [ -e "$STAGING_ROOT/Previous.app" ]; then mv "$STAGING_ROOT/Previous.app" "$APP_DESTINATION"; fi
   exit 1
 fi
-mv -f "$STAGING_ROOT/$ZIP_NAME" "$PROJECT_ROOT/dist/$ZIP_NAME"
+# A development rebuild is not a verified release until release.sh runs again.
+rm -f "$RELEASE_DIR/release.json" "$RELEASE_DIR/SHA256SUMS.txt"
+mv -f "$STAGING_ROOT/$ZIP_NAME" "$RELEASE_DIR/$ZIP_NAME"
 for resource in index.html wallpaper.css wallpaper.js; do
   cp "$APP_DESTINATION/Contents/Resources/Web/$resource" "$BUILD/Web/$resource"
 done
 (
-  cd "$PROJECT_ROOT/dist"
+  cd "$RELEASE_DIR"
   shasum -a 256 "$ZIP_NAME" > "$ZIP_NAME.sha256"
 )
 echo "App built: $APP_DESTINATION"

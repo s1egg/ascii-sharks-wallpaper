@@ -138,7 +138,7 @@ open "dist/ASCII Sharks Wallpaper.app"
 
 There are no npm dependencies to install. Once the toolchain is available, the build does not need to download packages. Bun is only needed for development; the built app runs on its own.
 
-The build creates the app and an arm64 ZIP in `dist/`. To create a PKG installer:
+The build creates the app in `dist/` and its arm64 ZIP in `dist/releases/<version>/`. To create a PKG installer in that same versioned folder:
 
 ```sh
 bash scripts/package.sh
