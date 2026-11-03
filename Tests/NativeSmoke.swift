@@ -9,6 +9,7 @@ enum SmokeFailure: Error, CustomStringConvertible {
 @MainActor
 final class SmokeHarness: NSObject, NSApplicationDelegate {
     private var surface: WallpaperSurface?
+    private var pointerPosition = NSPoint(x: -100_000, y: -100_000)
     private var projectRoot: URL {
         if CommandLine.arguments.count > 1 { return URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true) }
         return Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
@@ -65,6 +66,7 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         defer { defaults.removePersistentDomain(forName: suite) }
         var settings = Settings(defaults: defaults)
         try check(settings.language == .english, "A fresh install must default to English")
+        try check(settings.interaction, "Gentle interaction must be enabled by default")
         defaults.set("solo", forKey: "scene")
         defaults.set(60, forKey: "frameRate")
         settings = Settings(defaults: defaults)
@@ -75,10 +77,11 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         settings.visible = false
         settings.allDisplays = false
         settings.speed = 0.5
+        settings.interaction = false
         settings.save(defaults: defaults)
         let restored = Settings(defaults: defaults)
         try check(restored.language == .simplifiedChinese && restored.paused && !restored.visible && !restored.allDisplays
-                  && restored.speed == 0.5 && restored.scene == .solo && restored.frameRate == 60,
+                  && restored.speed == 0.5 && restored.scene == .solo && restored.frameRate == 60 && !restored.interaction,
                   "Language and wallpaper preferences must survive relaunch")
         defaults.set("unsupported", forKey: "language")
         try check(Settings(defaults: defaults).language == .english, "Unknown language preferences must fall back to English")
@@ -121,6 +124,10 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         try check(try actionItem(.language(.english)).state == .on, "English must be selected initially")
         var selected: MenuAction?
         menu.onAction = { selected = $0 }
+        let interaction = try actionItem(.toggleInteraction)
+        try check(interaction.state == .off && interaction.toolTip != nil, "Interaction must reflect its saved preference and explain itself")
+        try check(NSApp.sendAction(interaction.action!, to: interaction.target, from: interaction), "Interaction toggle must be actionable")
+        try check(selected == .toggleInteraction, "Interaction must send the correct action")
         let chineseChoice = try actionItem(.language(.simplifiedChinese))
         guard let selectionAction = chineseChoice.action else { throw SmokeFailure.failed("Language action has no selector") }
         try check(NSApp.sendAction(selectionAction, to: chineseChoice.target, from: chineseChoice), "Language action must reach its target")
@@ -129,6 +136,7 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         menu.update(settings: settings, state: .playing(30), savingPower: false, localizer: chinese)
         menu.menuNeedsUpdate(menu.menu)
         try check(try actionItem(.togglePause).title == chinese.text("menu.pause"), "Reopening the menu must use the selected language")
+        try check(try actionItem(.toggleInteraction).title == chinese.text("menu.interaction"), "Interaction must be localized")
         try check(try actionItem(.language(.simplifiedChinese)).state == .on, "The selected language needs a checkmark")
         try check(try actionItem(.language(.english)).state == .off, "Only one language may be selected")
         try check(try actionItem(.allDisplays(false)).state == .on, "Primary-display preference must remain selected")
@@ -145,6 +153,11 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
 
     private func runChecks() async throws {
         try checkLocalization()
+        let portrait = NSRect(x: -1080, y: -300, width: 1080, height: 1920)
+        let mapped = DesktopPointer(at: NSPoint(x: -810, y: 1140), frame: portrait, visibleFrame: portrait, enabled: true, requestID: 1)
+        try check(mapped.active && mapped.x == 0.25 && mapped.y == 0.25, "Negative-origin portrait coordinates must map to top-down normalized points")
+        let outside = DesktopPointer(at: .zero, frame: portrait, visibleFrame: portrait, enabled: true, requestID: 2)
+        try check(!outside.active, "A cursor on another screen must not interact with this surface")
         guard let screen = NSScreen.screens.first else { throw SmokeFailure.failed("No display available") }
         let root = projectRoot
         var settings = Settings()
@@ -154,6 +167,7 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         settings.speed = 1
         settings.scene = .classic
         settings.language = .english
+        settings.interaction = true
         try check(settings.configuration(suspended: true, savingPower: false).paused, "Sleep must pause")
         try check(settings.configuration(suspended: false, savingPower: true).frameRate == 15, "Low power must cap FPS")
         settings.paused = true
@@ -164,7 +178,8 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         settings.visible = true
 
         var configuration = settings.configuration(suspended: false, savingPower: false)
-        let surface = try WallpaperSurface(screen: screen, resourceURL: root.appendingPathComponent("build/Web"), configuration: configuration)
+        let surface = try WallpaperSurface(screen: screen, resourceURL: root.appendingPathComponent("build/Web"), configuration: configuration,
+            pointerLocation: { [weak self] in self?.pointerPosition ?? .zero })
         self.surface = surface
         try check(surface.window.ignoresMouseEvents, "Wallpaper must pass clicks through")
         try check(!surface.window.canBecomeKey && !surface.window.canBecomeMain, "Wallpaper must never steal keyboard focus")
@@ -192,7 +207,41 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         if !reducedMotion {
             try check(frames(animated) > frames(initial), "Animation did not advance")
             try check(frames(animated) - frames(initial) < 45, "30 FPS cap was ignored")
+            pointerPosition = NSPoint(x: surface.window.frame.minX + surface.window.frame.width * 0.6,
+                                      y: surface.window.frame.maxY - surface.window.frame.height * 0.4)
+            try await wait(350)
+            let pointing = try await stats()
+            let pointer = pointing["pointer"] as? [String: Any] ?? [:]
+            try check(pointer["active"] as? Bool == true, "Native pointer sampling must reach the simulation")
+            try check(abs((pointer["x"] as? Double ?? -1) - 0.6) < 0.001
+                      && abs((pointer["y"] as? Double ?? -1) - 0.4) < 0.001, "Native input must map to Canvas coordinates")
+            configuration.interaction = false
+            surface.update(configuration: configuration, visible: true)
+            try await wait(200)
+            let disabled = try await stats()
+            try await wait(300)
+            let disabledLater = try await stats()
+            try check((disabledLater["pointer"] as? [String: Any])?["active"] as? Bool == false, "Disabling interaction must clear its field")
+            try check(disabled["pointerSamples"] as? Int == disabledLater["pointerSamples"] as? Int, "Disabling interaction must stop pointer sampling")
+            try check(frames(disabledLater) > frames(disabled), "Disabling interaction must preserve normal swimming")
+            configuration.interaction = true
+            surface.update(configuration: configuration, visible: true)
+            try await wait(250)
+            pointerPosition = NSPoint(x: surface.window.frame.maxX + 100, y: surface.window.frame.midY)
+            try await wait(250)
+            let departed = try await stats()
+            try check((departed["pointer"] as? [String: Any])?["active"] as? Bool == false, "Crossing to another display must release interaction")
         }
+        let stopFrame = try await surface.webView.evaluateJavaScript("""
+            (() => {
+                const before = window.wallpaper.stats();
+                window.wallpaper.configure({paused: true});
+                const after = window.wallpaper.stats();
+                return after.frames === before.frames + 1 && after.simulationTime === before.simulationTime
+                    && !after.scheduled && !after.pointer.active && after.pointer.marks === 0;
+            })()
+            """)
+        try check(stopFrame as? Bool == true, "Pause must paint one clean static frame without advancing time")
         configuration.paused = true
         surface.update(configuration: configuration, visible: true)
         try await wait(150)
@@ -201,6 +250,8 @@ final class SmokeHarness: NSObject, NSApplicationDelegate {
         let still = try await stats()
         try check(frames(paused) == frames(still) && time(paused) == time(still), "Pause must freeze simulation and render")
         try check(still["scheduled"] as? Bool == false, "Paused loop must schedule zero work")
+        try check(paused["pointerSamples"] as? Int == still["pointerSamples"] as? Int, "Pause must stop native pointer sampling too")
+        try check((still["pointer"] as? [String: Any])?["active"] as? Bool == false, "Pause must clear pointer state")
 
         configuration.language = .simplifiedChinese
         surface.update(configuration: configuration, visible: true)

@@ -6,12 +6,33 @@ final class DesktopWindow: NSWindow {
     override var canBecomeMain: Bool { false }
 }
 
+struct DesktopPointer: Encodable {
+    var x = 0.0
+    var y = 0.0
+    var active = false
+    var requestID: Int
+
+    init(at point: NSPoint, frame: NSRect, visibleFrame: NSRect, enabled: Bool, requestID: Int) {
+        self.requestID = requestID
+        guard enabled, frame.width > 0, frame.height > 0,
+              frame.contains(point), visibleFrame.contains(point) else { return }
+        // AppKit is bottom-up in global points; Canvas is top-down in local CSS pixels.
+        // Normalization also handles portrait displays and negative screen origins.
+        x = (point.x - frame.minX) / frame.width
+        y = (frame.maxY - point.y) / frame.height
+        active = true
+    }
+}
+
 @MainActor
 private final class ScriptHandler: NSObject, WKScriptMessageHandler {
     weak var surface: WallpaperSurface?
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: String] else { return }
+        if body["event"] == "pointer", let requestID = Int(body["message"] ?? "") {
+            surface?.samplePointer(requestID: requestID)
+        }
         if body["event"] == "error" {
             if let message = body["message"], !message.isEmpty { surface?.recordError(.details(message)) }
             else { surface?.recordError(.loadingFailed) }
@@ -32,10 +53,13 @@ final class WallpaperSurface: NSObject, WKNavigationDelegate {
     private var closed = false
     private var processRetries = 0
     private let scriptHandler = ScriptHandler()
+    private let pointerLocation: () -> NSPoint
 
-    init(screen: NSScreen, resourceURL: URL, configuration: WebConfiguration) throws {
+    init(screen: NSScreen, resourceURL: URL, configuration: WebConfiguration,
+         pointerLocation: @escaping () -> NSPoint = { NSEvent.mouseLocation }) throws {
         self.resourceURL = resourceURL
         self.configuration = configuration
+        self.pointerLocation = pointerLocation
         let webConfiguration = WKWebViewConfiguration()
         webConfiguration.websiteDataStore = .nonPersistent()
         webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -75,6 +99,19 @@ final class WallpaperSurface: NSObject, WKNavigationDelegate {
         lastError = nil
         webView.loadFileURL(resourceURL.appendingPathComponent("index.html"), allowingReadAccessTo: resourceURL)
         onStatusChange?()
+    }
+
+    func samplePointer(requestID: Int) {
+        guard isReady, !closed else { return }
+        let pointer = DesktopPointer(at: pointerLocation(), frame: window.frame,
+            visibleFrame: window.screen?.visibleFrame ?? window.frame,
+            enabled: wantsVisible && !configuration.paused && configuration.interaction
+                && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+            requestID: requestID)
+        guard let data = try? JSONEncoder().encode(pointer) else { return }
+        // The existing render loop requests samples, so there is no native polling timer,
+        // event tap, click interception, or input-monitoring permission prompt.
+        webView.evaluateJavaScript("window.wallpaper.pointer(\(String(decoding: data, as: UTF8.self)))", completionHandler: nil)
     }
 
     func update(configuration: WebConfiguration, visible: Bool) {

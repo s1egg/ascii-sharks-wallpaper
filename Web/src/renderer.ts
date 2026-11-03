@@ -168,7 +168,11 @@ export class AsciiRenderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.target.fill(0);
     this.occupied.fill(0);
+    if (world.moment?.kind === "visitor") {
+      for (const visitor of world.visitors) this.rasterizeShark(visitor, world.time, world.moment.opacity, false);
+    }
     for (const shark of world.sharks) this.rasterizeShark(shark, world.time);
+    this.drawWaterMarks(world);
     this.drawWakes(world);
     this.drawFish(world);
     this.drawSharks(dt);
@@ -317,7 +321,8 @@ export class AsciiRenderer {
     return false;
   }
 
-  private rasterizeShark(shark: Shark, time: number) {
+  private rasterizeShark(shark: Shark, time: number, presence = 1, foreground = true) {
+    if (presence < 0.008) return;
     this.prepareSpine(shark);
     const { spine, cw, ch, cols, rows } = this;
     const L = shark.length;
@@ -335,7 +340,7 @@ export class AsciiRenderer {
     const r1 = Math.min(rows - 1, Math.floor((maxY + reach) / ch));
     // Depth changes very slowly: submerged silhouettes emerge and recede in pale ink.
     const depth = clamp(shark.depth + Math.sin(time * 0.038 + shark.id * 1.6) * 0.035, 0.6, 1);
-    const depthInk = 0.32 + smoothstep(0.55, 1, depth) * 0.63;
+    const depthInk = (0.32 + smoothstep(0.55, 1, depth) * 0.63) * presence;
     for (let row = r0; row <= r1; row++) {
       for (let col = c0; col <= c1; col++) {
         const x = (col + 0.5) * cw, y = (row + 0.5) * ch;
@@ -349,7 +354,7 @@ export class AsciiRenderer {
         // Broken ink on the lit flank, with coherent pigment on the back.
         const dry = grain < 0.09 && this.hitFlag === BODY ? 0.68 : 1;
         const opacity = coverage * (0.29 + shade * 0.7) * depthInk * water * dry;
-        if (coverage > 0.4) this.occupied[index] = 1;
+        if (foreground && coverage > 0.4) this.occupied[index] = 1;
         if (opacity < this.target[index]) continue;
         let glyph: string;
         if (this.hitFlag === EYE) glyph = "o";
@@ -367,7 +372,7 @@ export class AsciiRenderer {
         this.targetGlyph[index] = GLYPHS.indexOf(glyph);
       }
     }
-    if (time - (this.wakeAt.get(shark.id) ?? -Infinity) > 0.72 + (1 - shark.stroke) * 0.65) {
+    if (foreground && time - (this.wakeAt.get(shark.id) ?? -Infinity) > 0.72 + (1 - shark.stroke) * 0.65) {
       const k = (SHARK_NODES - 1) * 2;
       const side = Math.sin(shark.phase) > 0 ? 1 : -1;
       const tx = spine[k] - spine[k - 2], ty = spine[k + 1] - spine[k - 1];
@@ -422,8 +427,25 @@ export class AsciiRenderer {
       const heading = Math.atan2(fish.vy, fish.vx);
       // A single short ASCII gesture follows its heading, with sub-cell movement.
       const character = Math.abs(Math.sin(heading)) < 0.38 ? "-" : Math.sin(heading) * Math.cos(heading) > 0 ? "\\" : "/";
-      const opacity = 0.09 + (fish.depth - 0.55) * 0.31 + Math.min(fish.alarm, 0.6) * 0.035;
+      const pointer = world.pointer;
+      const nearbyInk = pointer.influence * (1 - smoothstep(28, 90, Math.hypot(fish.x - pointer.x, fish.y - pointer.y))) * 0.12;
+      const opacity = 0.12 + (fish.depth - 0.55) * 0.24 + Math.min(fish.alarm, 0.6) * 0.025 + nearbyInk;
       this.drawGlyph(GLYPHS.indexOf(character), fish.x, fish.y, opacity);
+    }
+  }
+
+  private drawWaterMarks(world: World) {
+    for (const mark of world.pointer.marks) {
+      const radius = 14 + mark.age * 42;
+      const fade = smoothstep(0, 0.08, mark.age) * (1 - smoothstep(0.5, 2.2, mark.age));
+      // Broken, upright glyphs suggest water; never draw a solid ring.
+      for (let k = 0; k < 24; k++) {
+        if (k % 4 === 0) continue;
+        const angle = mark.heading + k / 24 * Math.PI * 2;
+        const opacity = mark.strength * fade * (0.18 + 0.07 * Math.sin(k * 2.7) ** 2);
+        this.drawGlyph(GLYPHS.indexOf(k % 2 ? "." : ","), mark.x + Math.cos(angle) * radius,
+          mark.y + Math.sin(angle) * radius * 0.72, opacity);
+      }
     }
   }
 

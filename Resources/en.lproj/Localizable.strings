@@ -4,6 +4,8 @@
 "menu.show" = "Show Wallpaper";
 "menu.hide" = "Hide Wallpaper";
 "menu.scene" = "Scene";
+"menu.interaction" = "Gentle Mouse Interaction";
+"interaction.hint" = "Move to part the fish; linger briefly near a passing shark to spark its curiosity. Desktop clicks pass through.";
 "menu.frameRate" = "Frame Rate";
 "menu.speed" = "Swim Speed";
 "menu.displays" = "Displays";
@@ -14,6 +16,7 @@
 "menu.quit" = "Quit ASCII Sharks Wallpaper";
 "scene.classic" = "Classic · 4 sharks";
 "scene.mixed" = "Mixed · 4 sharks";
+"scene.mixed.hint" = "Hammerheads patrol across the water, makos make occasional short bursts, and threshers turn slowly.";
 "scene.solo" = "Solo · 1 shark";
 "frameRate.low" = "15 FPS · Low Power";
 "frameRate.balanced" = "30 FPS · Balanced";

@@ -4,6 +4,8 @@
 "menu.show" = "显示壁纸";
 "menu.hide" = "隐藏壁纸";
 "menu.scene" = "海洋场景";
+"menu.interaction" = "鼠标轻互动";
+"interaction.hint" = "移动鼠标拨开鱼群；在经过的鲨鱼附近停留片刻，引它靠近看看。桌面点击仍可穿透。";
 "menu.frameRate" = "帧率";
 "menu.speed" = "游动速度";
 "menu.displays" = "显示器";
@@ -14,6 +16,7 @@
 "menu.quit" = "退出 ASCII Sharks Wallpaper";
 "scene.classic" = "经典鲨群 · 4 条";
 "scene.mixed" = "混合物种 · 4 条";
+"scene.mixed.hint" = "锤头鲨偏爱横向巡视，灰鲭鲨偶尔短促加速，长尾鲨舒缓转身。";
 "scene.solo" = "独游 · 1 条";
 "frameRate.low" = "15 FPS · 节能";
 "frameRate.balanced" = "30 FPS · 均衡";

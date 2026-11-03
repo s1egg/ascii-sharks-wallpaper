@@ -24,32 +24,32 @@ export const SPECIES: Species[] = [
   {
     name: "sardine",
     cruise: 22, maxSpeed: 42, minSpeed: 11, weight: 3,
-    schoolSize: [18, 28], spacing: [1.8, 1.1],
-    align: 1.6, cohesion: 1.6, jitter: 13, mill: 38, verticalDrag: 0.5,
+    schoolSize: [4, 7], spacing: [3.4, 2],
+    align: 1.8, cohesion: 0.65, jitter: 6, mill: 0, verticalDrag: 0.9,
   },
   {
     name: "anchovy",
     cruise: 28, maxSpeed: 48, minSpeed: 14, weight: 3,
-    schoolSize: [20, 32], spacing: [1.5, 1],
-    align: 3.2, cohesion: 0.45, jitter: 10, mill: 0, verticalDrag: 1.4,
+    schoolSize: [4, 7], spacing: [3.2, 1.9],
+    align: 3.2, cohesion: 0.3, jitter: 6, mill: 0, verticalDrag: 1.4,
   },
   {
     name: "silverside",
     cruise: 24, maxSpeed: 44, minSpeed: 12, weight: 3,
-    schoolSize: [12, 20], spacing: [2, 1.1],
-    align: 2.4, cohesion: 1.1, jitter: 11, mill: 0, verticalDrag: 1.6,
+    schoolSize: [3, 6], spacing: [3.6, 2.1],
+    align: 2.4, cohesion: 0.55, jitter: 6, mill: 0, verticalDrag: 1.6,
   },
   {
     name: "mackerel",
     cruise: 20, maxSpeed: 38, minSpeed: 10, weight: 2,
-    schoolSize: [5, 9], spacing: [2.6, 1.3],
-    align: 2, cohesion: 0.9, jitter: 9, mill: 0, verticalDrag: 2,
+    schoolSize: [3, 5], spacing: [4, 2.2],
+    align: 2, cohesion: 0.5, jitter: 5, mill: 0, verticalDrag: 2,
   },
   {
     name: "goby",
     cruise: 16, maxSpeed: 34, minSpeed: 7, weight: 1,
-    schoolSize: [8, 12], spacing: [1.4, 1.1],
-    align: 0.35, cohesion: 1.4, jitter: 28, mill: 0, verticalDrag: 0.3,
+    schoolSize: [3, 4], spacing: [3, 2],
+    align: 0.8, cohesion: 0.5, jitter: 10, mill: 0, verticalDrag: 0.6,
   },
 ];
 

@@ -133,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch action {
         case .togglePause: settings.paused.toggle()
         case .toggleVisibility: settings.visible.toggle()
+        case .toggleInteraction: settings.interaction.toggle()
         case .scene(let scene): settings.scene = scene
         case .frameRate(let rate): settings.frameRate = rate
         case .speed(let speed): settings.speed = speed

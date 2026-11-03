@@ -18,9 +18,10 @@ struct Settings {
     var speed = 1.0
     var scene = Scene.classic
     var language = AppLanguage.english
+    var interaction = true
 
     init(defaults: UserDefaults = .standard) {
-        defaults.register(defaults: ["visible": true, "allDisplays": true, "frameRate": 30, "speed": 1.0])
+        defaults.register(defaults: ["visible": true, "allDisplays": true, "frameRate": 30, "speed": 1.0, "interaction": true])
         paused = defaults.bool(forKey: "paused")
         visible = defaults.bool(forKey: "visible")
         allDisplays = defaults.bool(forKey: "allDisplays")
@@ -30,6 +31,7 @@ struct Settings {
         speed = [0.5, 1.0, 1.5].contains(storedSpeed) ? storedSpeed : 1.0
         scene = Scene(rawValue: defaults.string(forKey: "scene") ?? "") ?? .classic
         language = AppLanguage(rawValue: defaults.string(forKey: "language") ?? "") ?? .english
+        interaction = defaults.bool(forKey: "interaction")
     }
 
     func save(defaults: UserDefaults = .standard) {
@@ -40,6 +42,7 @@ struct Settings {
         defaults.set(speed, forKey: "speed")
         defaults.set(scene.rawValue, forKey: "scene")
         defaults.set(language.rawValue, forKey: "language")
+        defaults.set(interaction, forKey: "interaction")
     }
 
     func configuration(suspended: Bool, savingPower: Bool) -> WebConfiguration {
@@ -49,7 +52,8 @@ struct Settings {
             speed: speed,
             pixelRatio: savingPower ? 1 : 1.5,
             scene: scene,
-            language: language
+            language: language,
+            interaction: interaction
         )
     }
 }
@@ -61,6 +65,7 @@ struct WebConfiguration: Encodable {
     var pixelRatio: Double
     var scene: Scene
     var language: AppLanguage = .english
+    var interaction = true
 
     func json() throws -> String {
         String(decoding: try JSONEncoder().encode(self), as: UTF8.self)

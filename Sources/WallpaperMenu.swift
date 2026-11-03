@@ -1,7 +1,7 @@
 import AppKit
 
 enum MenuAction: Equatable {
-    case togglePause, toggleVisibility, reload, showError, about, quit
+    case togglePause, toggleVisibility, toggleInteraction, reload, showError, about, quit
     case scene(Scene)
     case frameRate(Int)
     case speed(Double)
@@ -71,8 +71,14 @@ final class WallpaperMenu: NSObject, NSMenuDelegate {
 
         let scenes = submenu(localizer.text("menu.scene"), symbol: "fish")
         for scene in Scene.allCases {
-            scenes.addItem(item(localizer.text(scene.titleKey), action: .scene(scene), checked: settings.scene == scene))
+            let choice = item(localizer.text(scene.titleKey), action: .scene(scene), checked: settings.scene == scene)
+            if scene == .mixed { choice.toolTip = localizer.text("scene.mixed.hint") }
+            scenes.addItem(choice)
         }
+        let interaction = item(localizer.text("menu.interaction"), action: .toggleInteraction,
+                               symbol: "cursorarrow.rays", checked: settings.interaction)
+        interaction.toolTip = localizer.text("interaction.hint")
+        menu.addItem(interaction)
         let rates = submenu(localizer.text("menu.frameRate"), symbol: "speedometer")
         for (rate, key) in [(15, "frameRate.low"), (30, "frameRate.balanced"), (60, "frameRate.smooth")] {
             rates.addItem(item(localizer.text(key), action: .frameRate(rate), checked: settings.frameRate == rate))

@@ -13,8 +13,9 @@
  * so stragglers get picked off. Eaten fish come back later as new schools
  * swimming in from the edges, which keeps the population steady.
  */
-import { angleDiff, clamp, current, rand, randInt, smoothstep, TAU } from "./math";
+import { angleDiff, clamp, current, hash3, rand, randInt, smoothstep, TAU } from "./math";
 import { pickSpecies, SPECIES } from "./species";
+import { WaterInteraction } from "./interaction";
 
 export const SHARK_NODES = 20;
 
@@ -37,6 +38,8 @@ export interface Fish {
   vx: number;
   vy: number;
   species: number;
+  /** Small, persistent groups do not merge just because they share a species. */
+  school: number;
   /** 0 calm → 1 panicking. Spreads to neighbours. */
   alarm: number;
   alive: boolean;
@@ -73,7 +76,16 @@ export interface Shark {
   retargetAt: number;
   /** 0 far / dim → 1 near / bright. */
   depth: number;
+  patrolDirection: 1 | -1;
+  patrolLane: number;
+  burst: number;
+  burstStartedAt: number;
+  nextBurstAt: number;
 }
+
+export type OceanMoment =
+  | { kind: "crossing"; startedAt: number; school: number; direction: 1 | -1; lane: number; crossed: boolean }
+  | { kind: "visitor"; startedAt: number; direction: 1 | -1; lane: number; duration: number; opacity: number };
 
 export interface WorldEvent {
   kind: "eat" | "splash";
@@ -93,8 +105,13 @@ export class World {
   time = 0;
   fish: Fish[] = [];
   sharks: Shark[] = [];
+  visitors: Shark[] = [];
+  moment: OceanMoment | null = null;
+  momentsStarted = 0;
+  momentsCompleted = 0;
   events: WorldEvent[] = [];
-  pointer = { x: 0, y: 0, active: false };
+  pointer = new WaterInteraction();
+  curiosity = { sharkId: null as number | null, x: 0, y: 0, age: 0, weight: 0 };
 
   /** Fish neighbourhood radius; the spatial hash bucket size matches it. */
   private perception = 60;
@@ -108,6 +125,10 @@ export class World {
   private bucketCount = new Uint16Array(0);
   private bucketNext = new Int32Array(0);
   private lastSpawn = 0;
+  private nextSchool = 1;
+  private nextMomentAt = Infinity;
+  private nextMomentKind: OceanMoment["kind"] = "crossing";
+  private nextVisitorID = 1000;
   private tmp = { x: 0, y: 0 };
 
   /** fishCount overrides the area-based population (the sidebar wants a single small school). */
@@ -117,6 +138,7 @@ export class World {
   ) {}
 
   resize(width: number, height: number, cellW: number, cellH: number) {
+    this.clearInteraction();
     const first = this.width === 0;
     const previousWidth = this.width;
     const previousHeight = this.height;
@@ -126,7 +148,7 @@ export class World {
     this.sepX = SPECIES.map((sp) => sp.spacing[0] * cellW);
     this.sepY = SPECIES.map((sp) => sp.spacing[1] * cellH);
     this.perception = Math.max(cellH * 3, cellW * 5.5);
-    this.foreignSep = cellW * 3;
+    this.foreignSep = cellW * 4.5;
 
     if (first) {
       this.seed();
@@ -140,7 +162,7 @@ export class World {
       f.x = clamp(f.x * scaleX, 0, width);
       f.y = clamp(f.y * scaleY, 0, height);
     }
-    for (const shark of this.sharks) {
+    for (const shark of [...this.sharks, ...this.visitors]) {
       const oldHeadX = shark.nodes[0];
       const oldHeadY = shark.nodes[1];
       for (let k = 0; k < SHARK_NODES; k++) {
@@ -149,6 +171,12 @@ export class World {
       }
       shark.length *= lengthScale;
       shark.orbitRadius *= Math.min(width, height) / Math.min(previousWidth, previousHeight);
+    }
+    if (this.moment?.kind === "visitor" && this.visitors[0]) {
+      const visitor = this.visitors[0];
+      const remaining = this.moment.direction > 0 ? width + visitor.length * 1.4 - visitor.nodes[0]
+        : visitor.nodes[0] + visitor.length * 1.4;
+      this.moment.duration = this.time - this.moment.startedAt + Math.max(6, remaining / clamp(width / 38, 24, 52) + 6);
     }
   }
 
@@ -173,7 +201,8 @@ export class World {
       const placement = sharkCount === 1 ? [0.61, 0.45, -0.4] : composition[i];
       const x = placement ? W * (placement[0] + rand(-0.018, 0.018)) : W / 2 + Math.cos(a) * orbitRadius;
       const y = placement ? H * (placement[1] + rand(-0.018, 0.018)) : H / 2 + Math.sin(a) * orbitRadius;
-      const heading = placement ? placement[2] + rand(-0.08, 0.08) : a + orbitDir * Math.PI / 2;
+      let heading = placement ? placement[2] + rand(-0.08, 0.08) : a + orbitDir * Math.PI / 2;
+      if (kind === "hammerhead" || kind === "greathammer") heading = Math.cos(heading) >= 0 ? -0.04 : Math.PI + 0.04;
       const nodes = new Float32Array(SHARK_NODES * 2);
       const seg = length / (SHARK_NODES - 1);
       for (let n = 0; n < SHARK_NODES; n++) {
@@ -197,40 +226,66 @@ export class World {
         target: null,
         retargetAt: 0,
         depth: size,
+        patrolDirection: Math.cos(heading) >= 0 ? 1 : -1,
+        patrolLane: clamp(y / H, 0.28, 0.72),
+        burst: 0,
+        burstStartedAt: -Infinity,
+        nextBurstAt: kind === "mako" ? 14 + hash3(i + 1, 37, 19) * 14 : Infinity,
       });
     }
     // Smaller (farther) sharks draw first so the big one swims over them.
     this.sharks.sort((a, b) => a.length - b.length);
 
-    const total = this.fishCount ?? clamp(Math.round((W * H) / 10000), 40, 170);
+    const total = this.fishCount ?? clamp(Math.round((W * H) / 24000), 24, 64);
     this.fish = [];
+    const centers: { x: number; y: number }[] = [];
     while (this.fish.length < total) {
       const species = pickSpecies();
       const sp = SPECIES[species];
       const size = Math.min(randInt(sp.schoolSize[0], sp.schoolSize[1]), total - this.fish.length);
       const millDir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-      const cx = rand(W * 0.06, W * 0.94);
-      const cy = rand(H * 0.08, H * 0.92);
+      const school = this.nextSchool++;
+      const depth = rand(0.58, 0.94);
+      // Spread a few loose groups around open water instead of stacking random clumps.
+      let cx = 0, cy = 0, bestClearance = -Infinity;
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const x = rand(W * 0.1, W * 0.9), y = rand(H * 0.12, H * 0.88);
+        const central = ((x - W / 2) / (W * 0.23)) ** 2 + ((y - H / 2) / (H * 0.18)) ** 2;
+        const clearance = Math.min(Math.min(W, H) * 0.2,
+          ...centers.map(center => Math.hypot(x - center.x, y - center.y))) - (central < 1 ? 150 : 0);
+        if (clearance > bestClearance) { cx = x; cy = y; bestClearance = clearance; }
+        if (clearance >= Math.min(W, H) * 0.2) break;
+      }
+      centers.push({ x: cx, y: cy });
       // Mostly level headings: fish cruise sideways far more than up or down.
       const dir = (Math.random() < 0.5 ? 0 : Math.PI) + rand(-0.5, 0.5);
       for (let k = 0; k < size; k++) {
+        const along = ((k - (size - 1) / 2) * 1.35 + rand(-0.2, 0.2)) * this.sepX[species];
+        const across = rand(-0.9, 0.9) * this.sepY[species];
         this.fish.push({
-          x: cx + rand(-1, 1) * this.sepX[species] * Math.sqrt(size),
-          y: cy + rand(-1, 1) * this.sepY[species] * Math.sqrt(size) * 0.6,
+          x: cx + Math.cos(dir) * along - Math.sin(dir) * across,
+          y: cy + Math.sin(dir) * along + Math.cos(dir) * across,
           vx: Math.cos(dir) * sp.cruise,
           vy: Math.sin(dir) * sp.cruise,
           species,
+          school,
           alarm: 0,
           alive: true,
           respawnAt: 0,
           phase: rand(0, TAU),
           turn: 0,
-          depth: rand(0.55, 1),
+          depth: clamp(depth + rand(-0.035, 0.035), 0.55, 1),
           millDir,
         });
       }
     }
     this.bucketNext = new Int32Array(this.fish.length);
+    this.visitors = [];
+    this.moment = null;
+    this.momentsStarted = this.momentsCompleted = 0;
+    this.nextMomentKind = "crossing";
+    this.nextMomentAt = this.fishCount === undefined && this.sharks.length
+      ? this.time + 55 + hash3(Math.round(W), Math.round(H), sharkCount) * 30 : Infinity;
   }
 
   splash(x: number, y: number) {
@@ -250,8 +305,68 @@ export class World {
     }
   }
 
-  step(dt: number) {
+  clearInteraction() {
+    this.pointer.clear();
+    this.curiosity.sharkId = null;
+    this.curiosity.weight = this.curiosity.age = 0;
+  }
+
+  private stepInteraction(dt: number) {
+    const pointer = this.pointer, visit = this.curiosity;
+    pointer.step(dt);
+    // Water marks belong to an encounter with a live fish, not to the cursor.
+    // Swept hits catch fast passes between native samples without trailing into empty water.
+    for (const sweep of pointer.takeSweeps()) {
+      const dx = sweep.x - sweep.fromX, dy = sweep.y - sweep.fromY;
+      const length2 = dx * dx + dy * dy;
+      let first = Infinity;
+      for (const fish of this.fish) {
+        if (!fish.alive) continue;
+        const t = clamp(((fish.x - sweep.fromX) * dx + (fish.y - sweep.fromY) * dy) / length2, 0, 1);
+        const x = sweep.fromX + dx * t, y = sweep.fromY + dy * t;
+        if ((fish.x - x) ** 2 + (fish.y - y) ** 2 <= 28 ** 2 && t < first) first = t;
+      }
+      if (first !== Infinity) pointer.contact(sweep.fromX + dx * first, sweep.fromY + dy * first, sweep);
+    }
+    const interested = pointer.active && pointer.dwell >= 0.6;
+    if (interested && !pointer.visited && visit.sharkId === null) {
+      let nearest: Shark | undefined;
+      let distance = Infinity;
+      for (const shark of this.sharks) {
+        const dx = pointer.x - shark.nodes[0], dy = pointer.y - shark.nodes[1];
+        const d = Math.hypot(dx, dy);
+        // A passing animal can notice a nearby point without an abrupt U-turn.
+        const ahead = (dx * Math.cos(shark.heading) + dy * Math.sin(shark.heading)) / Math.max(1, d);
+        if (d < Math.min(540, shark.length * 1.8) && d < distance
+          && (ahead > -0.25 || d < shark.length * 0.5)) {
+          nearest = shark;
+          distance = d;
+        }
+      }
+      if (nearest) {
+        visit.sharkId = nearest.id;
+        visit.x = pointer.x;
+        visit.y = pointer.y;
+        visit.age = 0;
+        pointer.visited = true;
+      }
+    }
+    if (visit.sharkId !== null) {
+      visit.age += dt;
+      // A parked cursor earns one short visit, not an endless orbit.
+      const desired = interested && pointer.visited && visit.age < 12 ? 1 : 0;
+      visit.weight += (desired - visit.weight) * (1 - Math.exp(-dt * (desired ? 4.5 : 2.8)));
+      if (!desired && visit.weight < 0.01) {
+        visit.sharkId = null;
+        visit.weight = 0;
+      }
+    }
+  }
+
+  step(dt: number, interactionDt = dt) {
     this.time += dt;
+    this.stepInteraction(interactionDt);
+    this.stepMoments(dt);
     this.rebuildHash();
     this.stepFish(dt);
     this.stepSharks(dt);
@@ -303,11 +418,13 @@ export class World {
     const cur = this.tmp;
     const calmDecay = Math.exp(-dt * 0.7);
     const contagion = Math.min(1, dt * 6);
+    const crossing = this.moment?.kind === "crossing" ? this.moment : null;
 
     for (let i = 0; i < fish.length; i++) {
       const f = fish[i];
       if (!f.alive) continue;
       const sp = SPECIES[f.species];
+      const passing = crossing?.school === f.school;
       // Alarmed fish want more room: the school flashes apart around a
       // shark and closes back up once the threat fades.
       const spread = 1 + 1.8 * f.alarm;
@@ -354,14 +471,14 @@ export class World {
                     sx -= qx * k;
                     sy -= qy * k;
                   }
-                  if (o.species === f.species) {
+                  if (o.school === f.school) {
                     avx += o.vx;
                     avy += o.vy;
                     cx += dx;
                     cy += dy;
                     n++;
                   } else if (d < foreignSep) {
-                    // Different species keep their own schools.
+                    // Separate groups keep space, even within the same species.
                     const k = ((1 - d / foreignSep) / d) * 0.6;
                     sx -= dx * k;
                     sy -= dy * k;
@@ -423,16 +540,16 @@ export class World {
         fear = Math.max(fear, Math.sqrt(w));
       }
 
-      if (pointer.active) {
-        const pr = 130;
+      if (pointer.influence > 0.005) {
+        const pr = 100 + pointer.influence * 140;
         const dx = f.x - pointer.x;
         const dy = f.y - pointer.y;
         const d = Math.hypot(dx, dy);
         if (d < pr && d > 1e-3) {
-          const w = (1 - d / pr) ** 2;
-          ax += (dx / d) * FISH_FLEE_K * w;
-          ay += (dy / d) * FISH_FLEE_K * w;
-          fear = Math.max(fear, Math.sqrt(w) * 0.8);
+          const w = (1 - d / pr) ** 1.6;
+          ax += (dx / d) * FISH_FLEE_K * w * pointer.influence * 1.1;
+          ay += (dy / d) * FISH_FLEE_K * w * pointer.influence * 1.1;
+          fear = Math.max(fear, Math.sqrt(w) * pointer.influence * 0.85);
         }
       }
 
@@ -451,11 +568,19 @@ export class World {
       else if (f.y > H - m) ay -= (f.y - (H - m)) * 7;
 
       // Ambient current and a little individual restlessness.
+      if (passing && crossing) {
+        const tx = (crossing.crossed ? (crossing.direction > 0 ? 0.9 : 0.1) : 0.5) * W - f.x;
+        const ty = crossing.lane * H - f.y;
+        const distance = Math.hypot(tx, ty) || 1;
+        const calm = 1 - f.alarm * 0.85;
+        ax += (tx / distance * sp.cruise * 1.15 - f.vx) * 0.9 * calm;
+        ay += (ty / distance * sp.cruise * 1.15 - f.vy) * 1.3 * calm;
+      }
       current(f.x, f.y, time, cur);
       ax += cur.x * 0.5 + (Math.random() - 0.5) * sp.jitter;
       ay += cur.y * 0.5 + (Math.random() - 0.5) * sp.jitter;
       // Swim level, except when bolting from danger.
-      ay -= f.vy * sp.verticalDrag * (1 - 0.7 * f.alarm);
+      ay -= f.vy * sp.verticalDrag * (1 - 0.7 * f.alarm) * (passing ? 0.35 : 1);
 
       // Relax toward a preferred speed that rises with panic.
       const preferred = sp.cruise * (1 + 1.3 * f.alarm);
@@ -492,6 +617,8 @@ export class World {
       const nodes = sh.nodes;
       const hx = nodes[0];
       const hy = nodes[1];
+      const patrolling = sh.kind === "hammerhead" || sh.kind === "greathammer";
+      const longTail = sh.kind === "thresher";
 
       sh.hunger = Math.min(1, sh.hunger + dt * 0.012);
 
@@ -511,6 +638,19 @@ export class World {
         sh.retargetAt = time + 1.2;
       }
       const t = sh.target;
+      const curiosity = this.curiosity.sharkId === sh.id ? this.curiosity.weight : 0;
+      if (sh.kind === "mako" && time >= sh.nextBurstAt) {
+        const aheadX = hx + Math.cos(sh.heading) * (14 + L * 0.028) * 7;
+        const aheadY = hy + Math.sin(sh.heading) * (14 + L * 0.028) * 7;
+        const clear = Math.min(hx, W - hx, hy, H - hy) > L * 0.45
+          && aheadX > 60 && aheadX < W - 60 && aheadY > 60 && aheadY < H - 60;
+        if (clear && this.curiosity.sharkId === null && !this.moment) {
+          sh.burstStartedAt = time;
+          sh.nextBurstAt = time + 34 + hash3(sh.id, Math.floor(time), 71) * 24;
+        } else sh.nextBurstAt = time + 2;
+      }
+      const burstAge = time - sh.burstStartedAt;
+      sh.burst = burstAge >= 0 && burstAge < 3 ? Math.sin(burstAge / 3 * Math.PI) ** 2 : 0;
       let hunting = false;
       let closing = 0;
       if (t && t.alive && sh.hunger > 0.5) {
@@ -518,10 +658,10 @@ export class World {
         const tx = t.x + t.vx * 0.35 - hx;
         const ty = t.y + t.vy * 0.35 - hy;
         const d = Math.hypot(tx, ty) || 1;
-        const w = 0.65 + sh.hunger * 1.1;
+        const w = (0.65 + sh.hunger * 1.1) * (1 - curiosity);
         dx += (tx / d) * w;
         dy += (ty / d) * w;
-        hunting = true;
+        hunting = curiosity < 0.3;
         closing = clamp(1 - d / (L * 0.9), 0, 1);
       } else {
         // A broad circuit holds the open centre of the composition.
@@ -530,8 +670,31 @@ export class World {
         const r = Math.hypot(rx, ry) || 1;
         const radius = sh.orbitRadius * (1 + 0.15 * Math.sin(time * 0.05 + sh.id));
         const radial = clamp((radius - r) / radius, -1, 1);
-        dx += ((-ry / r) * sh.orbitDir + (rx / r) * radial * 0.9) * 0.55;
-        dy += ((rx / r) * sh.orbitDir + (ry / r) * radial * 0.9) * 0.55;
+        const orbitWeight = patrolling ? 0.18 : 0.55;
+        dx += ((-ry / r) * sh.orbitDir + (rx / r) * radial * 0.9) * orbitWeight;
+        dy += ((rx / r) * sh.orbitDir + (ry / r) * radial * 0.9) * orbitWeight;
+      }
+
+      if (patrolling) {
+        const margin = Math.max(L * 0.6, W * 0.14);
+        if (hx > W - margin) sh.patrolDirection = -1;
+        else if (hx < margin) sh.patrolDirection = 1;
+        const lane = H * (sh.patrolLane + Math.sin(time * 0.025 + sh.id) * 0.045);
+        const weight = (1 - curiosity) * (hunting ? 0.35 : 1);
+        dx += sh.patrolDirection * 2.4 * weight;
+        dy += clamp((lane - hy) / (H * 0.14), -1, 1) * 1.25 * weight;
+      }
+
+      let curiousApproach = 0;
+      if (curiosity > 0) {
+        const tx = this.curiosity.x - hx, ty = this.curiosity.y - hy;
+        const d = Math.hypot(tx, ty) || 1;
+        const radius = Math.max(65, L * 0.3);
+        curiousApproach = curiosity * smoothstep(radius * 0.85, radius * 2.8, d);
+        const approach = clamp((d - radius) / radius, -0.8, 1);
+        const tangent = 1 - smoothstep(radius, radius * 3, d);
+        dx += (tx / d * approach - ty / d * sh.orbitDir * tangent) * 2.8 * curiosity;
+        dy += (ty / d * approach + tx / d * sh.orbitDir * tangent) * 2.8 * curiosity;
       }
 
       // Give other sharks room.
@@ -565,6 +728,7 @@ export class World {
       const lookX = hx + Math.cos(sh.heading) * L * 1.2;
       const lookY = hy + Math.sin(sh.heading) * L * 1.2;
       const over = Math.max(-lookX, lookX - W, -lookY, lookY - H, -hx, hx - W, -hy, hy - H);
+      const edgeAttention = smoothstep(-L * 0.16, L * 0.3, over);
       if (over > -L * 0.16) {
         const w = clamp((over + L * 0.16) / (L * 0.42), 0, 1) * 6;
         const toX = cxW - hx;
@@ -576,40 +740,31 @@ export class World {
 
       const desired = Math.atan2(dy, dx);
       // Sharks can't pivot on the spot: the turning circle grows with speed.
-      const agility = Math.min(hunting ? 0.3 : 0.2, sh.speed / (L * (hunting ? 0.65 : 0.75)));
-      const desiredTurn = clamp(angleDiff(sh.heading, desired) * 0.65, -agility, agility);
-      sh.turn += (desiredTurn - sh.turn) * (1 - Math.exp(-dt * 1.8));
+      // Tighten smoothly near an edge so a long turn at a corner stays in view.
+      const ordinaryRadius = (longTail ? 1.05 : 0.75) - curiosity * 0.35;
+      const boundaryRadius = (longTail ? 1.05 : 0.75) - edgeAttention * (longTail ? 0.7 : 0.4);
+      const turnRadius = Math.min(hunting ? Math.min(ordinaryRadius, 0.65) : ordinaryRadius, boundaryRadius);
+      const turnLimit = longTail ? 0.13 + edgeAttention * 0.09 + curiosity * 0.1 : hunting ? 0.3 : 0.2 + curiosity * 0.18;
+      const agility = Math.min(turnLimit, sh.speed / (L * turnRadius));
+      const desiredTurn = clamp(angleDiff(sh.heading, desired) * (0.65 + curiosity * 0.75), -agility, agility);
+      sh.turn += (desiredTurn - sh.turn) * (1 - Math.exp(-dt * ((longTail ? 1 : 1.8) + curiosity * 2.2)));
       sh.heading += sh.turn * dt;
 
-      const cruise = 14 + L * 0.028;
+      const cruise = (14 + L * 0.028) * (longTail ? 0.86 : 1);
       // Each animal has its own long stroke/glide phrase, without stopping or
       // synchronising the school. Momentum outlasts the stronger tail strokes.
-      const phrase = Math.sin(time * (0.16 + sh.id * 0.009) + sh.id * 2.4);
-      const targetStroke = hunting ? 0.96 : 0.42 + smoothstep(-0.65, 0.8, phrase) * 0.54;
-      sh.stroke += (targetStroke - sh.stroke) * (1 - Math.exp(-dt * 0.8));
+      const phrase = Math.sin(time * ((longTail ? 0.115 : 0.16) + sh.id * 0.009) + sh.id * 2.4);
+      const targetStroke = hunting ? 0.96 : Math.max(0.42 + smoothstep(-0.65, 0.8, phrase) * 0.54, curiousApproach * 0.96, sh.burst);
+      sh.stroke += (targetStroke - sh.stroke) * (1 - Math.exp(-dt * (0.8 + curiosity * 1.2)));
       const breath = 1 + 0.025 * Math.sin(time * 0.19 + sh.id * 1.7);
-      const targetSpeed = cruise * breath * (hunting ? 1.12 + closing * 0.22 : 0.88 + sh.stroke * 0.12);
-      sh.speed += (targetSpeed - sh.speed) * (1 - Math.exp(-dt * 0.48));
-      const cadence = sh.kind === "mako" ? 1.08 : sh.kind === "zebra" || sh.kind === "thresher" ? 0.88 : 1;
+      // Notice promptly, close the gap, then ease back down beside the pointer.
+      const usualSpeed = (hunting ? 1.12 + closing * 0.22 : 0.88 + sh.stroke * 0.12) * (1 + curiousApproach * 0.7);
+      const targetSpeed = cruise * breath * Math.max(usualSpeed, 0.9 + sh.burst * 0.9);
+      sh.speed += (targetSpeed - sh.speed) * (1 - Math.exp(-dt * (0.48 + curiosity * 1.2 + sh.burst * 1.5)));
+      const cadence = sh.kind === "mako" ? 1.08 : longTail ? 0.74 : sh.kind === "zebra" ? 0.88 : 1;
       sh.phase += dt * (0.92 + sh.speed / 58) * (0.76 + sh.stroke * 0.24) * cadence;
 
-      nodes[0] += Math.cos(sh.heading) * sh.speed * dt;
-      nodes[1] += Math.sin(sh.heading) * sh.speed * dt;
-
-      // Follow-the-leader spine, with a stiffness limit per joint so the
-      // body bends into a C at most and never folds back on itself.
-      const seg = L / (SHARK_NODES - 1);
-      let prevAngle = sh.heading + Math.PI;
-      for (let k = 1; k < SHARK_NODES; k++) {
-        const maxBend = 0.075 + (k / (SHARK_NODES - 1)) * 0.065;
-        const px = nodes[(k - 1) * 2];
-        const py = nodes[(k - 1) * 2 + 1];
-        let angle = Math.atan2(nodes[k * 2 + 1] - py, nodes[k * 2] - px);
-        angle = prevAngle + clamp(angleDiff(prevAngle, angle), -maxBend, maxBend);
-        nodes[k * 2] = px + Math.cos(angle) * seg;
-        nodes[k * 2 + 1] = py + Math.sin(angle) * seg;
-        prevAngle = angle;
-      }
+      this.advanceShark(sh, dt);
 
       // Feed.
       if (sh.hunger > 0.15) {
@@ -626,6 +781,108 @@ export class World {
           }
         }
       }
+    }
+  }
+
+  private advanceShark(shark: Shark, dt: number) {
+    const nodes = shark.nodes;
+    nodes[0] += Math.cos(shark.heading) * shark.speed * dt;
+    nodes[1] += Math.sin(shark.heading) * shark.speed * dt;
+    const segment = shark.length / (SHARK_NODES - 1);
+    let previousAngle = shark.heading + Math.PI;
+    for (let k = 1; k < SHARK_NODES; k++) {
+      const maxBend = 0.075 + k / (SHARK_NODES - 1) * 0.065;
+      const px = nodes[(k - 1) * 2], py = nodes[(k - 1) * 2 + 1];
+      let angle = Math.atan2(nodes[k * 2 + 1] - py, nodes[k * 2] - px);
+      angle = previousAngle + clamp(angleDiff(previousAngle, angle), -maxBend, maxBend);
+      nodes[k * 2] = px + Math.cos(angle) * segment;
+      nodes[k * 2 + 1] = py + Math.sin(angle) * segment;
+      previousAngle = angle;
+    }
+  }
+
+  private finishMoment() {
+    this.moment = null;
+    this.visitors = [];
+    this.momentsCompleted++;
+    this.nextMomentAt = this.time + rand(90, 150);
+  }
+
+  private stepMoments(dt: number) {
+    const { width: W, height: H, time } = this;
+    if (!this.moment && time >= this.nextMomentAt) {
+      if (this.curiosity.sharkId !== null || this.pointer.speed > 35 || this.sharks.some(shark => shark.burst > 0.05)) {
+        this.nextMomentAt = time + 8;
+        return;
+      }
+      if (this.nextMomentKind === "crossing") {
+        const schools = new Map<number, { count: number; x: number; y: number }>();
+        for (const fish of this.fish) {
+          if (!fish.alive) continue;
+          const group = schools.get(fish.school) ?? { count: 0, x: 0, y: 0 };
+          group.count++; group.x += fish.x; group.y += fish.y;
+          schools.set(fish.school, group);
+        }
+        let choice: { school: number; x: number } | null = null, best = -Infinity;
+        for (const [school, group] of schools) {
+          if (group.count < 3 || group.count > 7) continue;
+          const x = group.x / group.count, y = group.y / group.count;
+          const score = Math.abs(x - W / 2) / W - Math.abs(y - H / 2) / H * 0.2;
+          if (score > best) { best = score; choice = { school, x }; }
+        }
+        if (!choice) { this.nextMomentAt = time + 15; return; }
+        this.moment = { kind: "crossing", startedAt: time, school: choice.school,
+          direction: choice.x < W / 2 ? 1 : -1, lane: rand(0.44, 0.56), crossed: false };
+        this.nextMomentKind = "visitor";
+      } else {
+        const kinds: SharkKind[] = ["thresher", "nurse", "zebra", "greathammer"];
+        const absent = kinds.filter(kind => !this.sharks.some(shark => shark.kind === kind));
+        const pool = absent.length ? absent : kinds;
+        const kind = pool[randInt(0, pool.length - 1)];
+        const direction: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+        const lane = Math.random() < 0.5 ? rand(0.2, 0.32) : rand(0.68, 0.8);
+        const length = clamp(Math.min(W, H) * 0.41, 140, 460) * 0.56;
+        const speed = clamp(W / 38, 24, 52), heading = direction > 0 ? 0 : Math.PI;
+        const x = direction > 0 ? -length : W + length, y = H * lane;
+        const nodes = new Float32Array(SHARK_NODES * 2);
+        for (let k = 0; k < SHARK_NODES; k++) {
+          nodes[k * 2] = x - direction * k * length / (SHARK_NODES - 1);
+          nodes[k * 2 + 1] = y;
+        }
+        this.visitors = [{ id: this.nextVisitorID++, kind, length, nodes, heading, speed, phase: rand(0, TAU),
+          stroke: 0.55, turn: 0, hunger: 0, wander: 0, orbitDir: direction, orbitRadius: 0, target: null,
+          retargetAt: Infinity, depth: 0.52, patrolDirection: direction, patrolLane: lane,
+          burst: 0, burstStartedAt: -Infinity, nextBurstAt: Infinity }];
+        this.moment = { kind: "visitor", startedAt: time, direction, lane,
+          duration: (W + length * 2.4) / speed + 6, opacity: 0 };
+        this.nextMomentKind = "crossing";
+      }
+      this.momentsStarted++;
+    }
+
+    const moment = this.moment;
+    if (!moment) return;
+    const age = time - moment.startedAt;
+    if (moment.kind === "crossing") {
+      const group = this.fish.filter(fish => fish.alive && fish.school === moment.school);
+      if (group.length < 2 || age > 70) { this.finishMoment(); return; }
+      const x = group.reduce((sum, fish) => sum + fish.x, 0) / group.length;
+      const y = group.reduce((sum, fish) => sum + fish.y, 0) / group.length;
+      if (Math.hypot(x - W / 2, y - H * moment.lane) < Math.max(80, this.perception * 2)) moment.crossed = true;
+      if (moment.crossed && (moment.direction > 0 ? x > W * 0.82 : x < W * 0.18)) this.finishMoment();
+    } else {
+      const shark = this.visitors[0];
+      if (!shark || age >= moment.duration) { this.finishMoment(); return; }
+      const opacity = smoothstep(0, 4, age) * (1 - smoothstep(moment.duration - 6, moment.duration, age)) * 0.65;
+      moment.opacity += (opacity - moment.opacity) * (1 - Math.exp(-dt * 3));
+      const lane = H * (moment.lane + Math.sin(age / moment.duration * TAU) * 0.025);
+      const desired = Math.atan2((lane - shark.nodes[1]) * 0.015, moment.direction);
+      const turn = clamp(angleDiff(shark.heading, desired) * 0.65, -0.1, 0.1);
+      shark.turn += (turn - shark.turn) * (1 - Math.exp(-dt));
+      shark.heading += shark.turn * dt;
+      shark.speed += (clamp(W / 38, 24, 52) - shark.speed) * (1 - Math.exp(-dt * 0.8));
+      shark.phase += dt * (shark.kind === "thresher" ? 1 : 1.35);
+      this.advanceShark(shark, dt);
     }
   }
 
@@ -682,14 +939,21 @@ export class World {
     const species = pickSpecies();
     const sp = SPECIES[species];
     const millDir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-    for (const f of due.slice(0, sp.schoolSize[1])) {
+    const school = this.nextSchool++;
+    const depth = rand(0.58, 0.94);
+    const arriving = due.slice(0, sp.schoolSize[1]);
+    for (const [index, f] of arriving.entries()) {
       f.alive = true;
       f.species = species;
+      f.school = school;
+      f.depth = clamp(depth + rand(-0.035, 0.035), 0.55, 1);
       f.alarm = 0;
       f.turn = 0;
       f.millDir = millDir;
-      f.x = x + rand(-1, 1) * this.perception;
-      f.y = y + rand(-1, 1) * this.perception;
+      const along = (index - (arriving.length - 1) / 2) * this.sepX[species] * 1.35;
+      const across = rand(-0.9, 0.9) * this.sepY[species];
+      f.x = x + Math.cos(inward) * along - Math.sin(inward) * across;
+      f.y = y + Math.sin(inward) * along + Math.cos(inward) * across;
       f.vx = Math.cos(inward) * sp.cruise * 1.4;
       f.vy = Math.sin(inward) * sp.cruise * 1.4;
     }
