@@ -1,12 +1,13 @@
 {
   "name": "ascii-sharks-wallpaper",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "license": "MIT",
   "scripts": {
     "build": "bash scripts/build.sh",
     "test": "bash scripts/test.sh",
     "test:web": "bun test Tests/world.test.ts",
-    "package": "bash scripts/package.sh"
+    "package": "bash scripts/package.sh",
+    "release": "bash scripts/release.sh"
   }
 }

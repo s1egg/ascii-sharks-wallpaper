@@ -11,6 +11,14 @@ fi
 APP="$PROJECT_ROOT/dist/ASCII Sharks Wallpaper.app"
 PLIST="$APP/Contents/Info.plist"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")"
+SOURCE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' scripts/Info.plist)"
+MANIFEST_VERSION="$(/usr/bin/python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+SOURCE_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' scripts/Info.plist)"
+APP_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
+if [ "$VERSION" != "$SOURCE_VERSION" ] || [ "$VERSION" != "$MANIFEST_VERSION" ] || [ "$APP_BUILD" != "$SOURCE_BUILD" ]; then
+  echo "The built app has a different version/build number. Run scripts/build.sh before packaging." >&2
+  exit 1
+fi
 PACKAGE_ID="dev.asciisharks.wallpaper.pkg"
 INSTALLER="$PROJECT_ROOT/dist/ASCII-Sharks-Wallpaper-$VERSION-arm64.pkg"
 WORK="$(mktemp -d "$PROJECT_ROOT/build/package.XXXXXX")"

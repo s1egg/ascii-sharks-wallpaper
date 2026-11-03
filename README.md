@@ -146,6 +146,8 @@ bash scripts/package.sh
 
 The packaging script builds the app, checks the installer payload and app signature, and writes a companion `.pkg.sha256` checksum. To package an existing build, use `bash scripts/package.sh --skip-build`.
 
+For a complete local release, commit the source and run `bun run release`. It verifies a clean commit and collects the archives, installer, bilingual release notes, checksums, and commit/build provenance in `dist/releases/<version>/`. See the [release workflow](docs/RELEASING.md), [changelog](CHANGELOG.md), and [0.1.2 release notes](docs/releases/0.1.2.md).
+
 ### Source map
 
 | Path | Responsibility |

@@ -1,8 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ICONSET="$PROJECT_ROOT/build/AppIcon.iconset"
 SOURCE="$PROJECT_ROOT/Assets/AppIcon.png"
+mkdir -p "$PROJECT_ROOT/build"
+ICON_WORK="$(mktemp -d "$PROJECT_ROOT/build/icon.XXXXXX")"
+trap 'rm -rf "$ICON_WORK"' EXIT
+ICONSET="$ICON_WORK/AppIcon.iconset"
 mkdir -p "$ICONSET"
 
 # Supply every macOS point size and its Retina representation.

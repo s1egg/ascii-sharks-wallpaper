@@ -146,6 +146,8 @@ bash scripts/package.sh
 
 打包脚本会构建应用、校验安装包内容及应用签名，并生成配套的 `.pkg.sha256` 校验文件。已有构建可用 `bash scripts/package.sh --skip-build` 直接打包。
 
+需要完整的本地发布包时，先提交源码，再运行 `bun run release`。命令会验证干净的 commit，将 ZIP、安装器、中英文更新说明、校验和及 commit／构建记录整理到 `dist/releases/<version>/`。详见[发布流程](docs/RELEASING.md)、[更新日志](CHANGELOG.md)和 [0.1.2 更新说明](docs/releases/0.1.2.zh-CN.md)。
+
 ### 源码导览
 
 | 路径 | 职责 |
