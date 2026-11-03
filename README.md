@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/app-icon.png" width="96" height="96" alt="ASCII Sharks Wallpaper app icon">
+  <img src="docs/assets/app-icon.png" width="72" height="72" alt="ASCII Sharks Wallpaper app icon">
 </p>
 
 <h1 align="center">ASCII Sharks Wallpaper</h1>
@@ -18,24 +18,19 @@
 </p>
 
 <p align="center">
-  <a href="#get-started">Get started</a> ·
+  <a href="https://github.com/s1egg/ascii-sharks-wallpaper/releases/latest"><strong>Download for Mac</strong></a> ·
+  <a href="#get-started">Installation</a> ·
   <a href="#scenes">Scenes</a> ·
   <a href="#development">Development</a> ·
   <a href="#faq">FAQ</a>
 </p>
 
-![Four ASCII sharks drifting through warm paper and pale celadon water](docs/assets/scene-classic.png)
+![ASCII sharks swimming in a cursor-free Remotion desktop demo with a clean menu bar and small Dock](docs/assets/macos-desktop.gif)
 
-<p align="center"><sub>Actual application rendering. Every shark, fish, and wake is drawn with characters.</sub></p>
+<p align="center"><sub>A ten-second Remotion desktop demo using the app's actual renderer; the desktop UI is illustrative. Every shark, fish, and wake is drawn with characters. <a href="docs/assets/macos-desktop.mp4">Watch the video</a> · <a href="docs/assets/scene-classic.png">View a still image</a>.</sub></p>
 
-<details>
-<summary>Watch the motion · an eight-second recording</summary>
-
-![A recording of ASCII sharks swimming with slow turns and gentle tail strokes](docs/assets/swimming.gif)
-
-An excerpt from the running renderer. The loop restarts at the end of the recording.
-
-</details>
+<p align="center">Free and open source · No accounts · No tracking<br>
+Enjoy this little ocean? <a href="https://github.com/s1egg/ascii-sharks-wallpaper">Give it a star</a> or share your ideas in <a href="https://github.com/s1egg/ascii-sharks-wallpaper/issues">Issues</a>.</p>
 
 <a name="features"></a>
 
@@ -43,8 +38,14 @@ An excerpt from the running renderer. The loop restarts at the end of the record
 
 Inspired by the spacing and tonal restraint of Chinese ink painting, ASCII Sharks Wallpaper turns a small ocean simulation into a calm desktop background. Sharks glide across a warm paper surface; schools of fish gather, scatter, and find their way back.
 
+Adapted from [stackedlol/ascii-sharks](https://github.com/stackedlol/ascii-sharks), this version adds ink-wash rendering, stroke-and-glide motion, and native macOS desktop integration.
+
 - **Characters with depth.** Glyph density, ink opacity, and soft transitions shape each silhouette. The animals are rendered live in Canvas.
 - **Unhurried movement.** Stable heads, articulated tails, gradual turns, and independent stroke-and-glide rhythms.
+- **Different swimming habits.** In Mixed, hammerheads patrol horizontally, makos occasionally make a short burst, and threshers turn with a slower tail rhythm.
+- **Something to notice.** Occasionally, an existing small school passes through the open water or one pale, uncommon shark swims by in the distance. Moments stay sparse and pause with the scene.
+- **Room to breathe.** Sparse small fish travel in loose groups of at most seven, with soft ink and generous spacing. The sharks remain the focus; fish near the pointer become a little clearer.
+- **A little curiosity.** Move the pointer to part nearby schools; character ripples appear only when it touches small fish, leaving empty water quiet. Linger for about 0.6 seconds near a passing shark and one may turn and briefly accelerate toward you, easing down as it approaches. Gentle Mouse Interaction is on by default and can be switched off in the menu.
 - **A native place on your Mac.** A Swift menu bar app with wallpaper windows behind desktop icons. Clicks pass through, and keyboard focus stays with your work.
 - **Considerate animation.** Pause and hide stop animation scheduling. Low Power Mode or serious thermal pressure caps rendering at 15 FPS and lowers resolution. Reduce Motion keeps the scene still.
 - **Your preferred pace.** Three scenes, three frame-rate limits, three swim speeds, and a choice of all displays or the primary display. Preferences persist between launches.
@@ -63,9 +64,9 @@ Inspired by the spacing and tonal restraint of Chinese ink painting, ASCII Shark
       <sub>Four familiar silhouettes, layered in pale ink.</sub>
     </td>
     <td width="33%" align="center">
-      <a href="docs/assets/scene-mixed.png"><img src="docs/assets/scene-mixed.png" alt="Mixed scene with hammerhead, tiger, mako, and zebra sharks"></a><br>
+      <a href="docs/assets/scene-mixed.png"><img src="docs/assets/scene-mixed.png" alt="Mixed scene with hammerhead, tiger, mako, and thresher sharks"></a><br>
       <strong>Mixed</strong><br>
-      <sub>Hammerhead, tiger, mako, and zebra sharks.</sub>
+      <sub>Hammerhead, tiger, mako, and thresher sharks.</sub>
     </td>
     <td width="33%" align="center">
       <a href="docs/assets/scene-solo.png"><img src="docs/assets/scene-solo.png" alt="Solo scene with one shark and small schools of fish"></a><br>
@@ -81,34 +82,15 @@ Inspired by the spacing and tonal restraint of Chinese ink painting, ASCII Shark
 
 **An Apple Silicon Mac and macOS 13 or later are required.** The app starts in English, and installer instructions are in English. Choose **Language → 简体中文** in the app menu for Simplified Chinese; the choice is saved and requires no restart.
 
-### Build from source
+### Download and install
 
-Install [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/) with a **Swift 6** compiler and [Bun](https://bun.com/docs/installation). The recorded build environment uses Swift 6.2.4 and Bun 1.4.2. macOS 13 is the app's deployment target; building requires a macOS version supported by your Swift toolchain.
+1. Open the [latest release](https://github.com/s1egg/ascii-sharks-wallpaper/releases/latest) and download the **arm64 ZIP**.
+2. Extract it and drag **ASCII Sharks Wallpaper.app** into **Applications**.
+3. Open the app, then click the **fish icon in the menu bar** to choose a scene, adjust the speed, or pause the animation. The app has no Dock icon or main window.
 
-From the repository root:
+You can also download the **PKG installer** from the same release to install into `/Applications`. It has no installation scripts and does not launch the app automatically. If an older instance is running, quit it from its menu bar icon before opening the new version.
 
-```sh
-bash scripts/build.sh
-open "dist/ASCII Sharks Wallpaper.app"
-```
-
-There are no npm dependencies to install. Once the toolchain is available, the build does not need to download packages. Bun is only needed for development; the built app runs on its own.
-
-### Install a local build
-
-| File in `dist/` | How to use it |
-| --- | --- |
-| `ASCII Sharks Wallpaper.app` | Open directly, or drag into Applications. |
-| `ASCII-Sharks-Wallpaper-0.1.1-arm64.zip` | Extract, then move the app into Applications. |
-| `ASCII-Sharks-Wallpaper-0.1.1-arm64.pkg` | Open the installer to place the app in `/Applications`. Generate it with the command below. |
-
-```sh
-bash scripts/package.sh
-```
-
-The packaging script builds the app, checks the installer payload and app signature, and writes a companion `.pkg.sha256` checksum. To package an existing build, use `bash scripts/package.sh --skip-build`. The installer has no installation scripts and does not launch the app automatically.
-
-If an older instance is running, quit it from the fish icon before opening the new build. After launch, look for that icon in the menu bar; this app has no Dock icon or main window.
+No Xcode, Bun, or other developer tools are needed to run the downloaded app. To build it yourself, see [Build from source](#build-from-source).
 
 > **Distribution status:** the app uses local ad hoc signing. Developer ID signing and Apple notarization are not configured. A build copied to another Mac may trigger a macOS security prompt.
 
@@ -123,6 +105,7 @@ Click the fish icon in the menu bar. Playback, scene and performance, display an
 | `Pause Animation` / `Resume Animation` | Pause / resume | Animation starts running on first launch. |
 | `Hide Wallpaper` / `Show Wallpaper` | Show / hide the wallpaper | Shown by default. |
 | `Scene` | Choose a scene | Classic · Mixed · Solo; **Classic** by default. |
+| `Gentle Mouse Interaction` | Part nearby fish and invite a passing shark by lingering | **On** by default; clicks still pass through. |
 | `Frame Rate` | Set the frame-rate limit | 15 / **30** / 60 FPS, labeled Low Power / Balanced / Smooth. |
 | `Swim Speed` | Set swim speed | 0.5× / **1×** / 1.5×. |
 | `Displays` | Choose display coverage | **All Displays** / Primary Display Only. |
@@ -140,6 +123,31 @@ The app also listens for sleep, display sleep, and session changes to pause and 
 
 **Swift / AppKit → local WKWebView → TypeScript / Canvas 2D.** Bun compiles the animation into one browser script. The native app owns the menu, desktop windows, preferences, and system events; the web layer owns simulation and rendering.
 
+<a name="build-from-source"></a>
+
+### Build from source
+
+Install [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/) with a **Swift 6** compiler and [Bun](https://bun.com/docs/installation). The recorded build environment uses Swift 6.2.4 and Bun 1.4.2. macOS 13 is the app's deployment target; building requires a macOS version supported by your Swift toolchain.
+
+From the repository root:
+
+```sh
+bash scripts/build.sh
+open "dist/ASCII Sharks Wallpaper.app"
+```
+
+There are no npm dependencies to install. Once the toolchain is available, the build does not need to download packages. Bun is only needed for development; the built app runs on its own.
+
+The build creates the app and an arm64 ZIP in `dist/`. To create a PKG installer:
+
+```sh
+bash scripts/package.sh
+```
+
+The packaging script builds the app, checks the installer payload and app signature, and writes a companion `.pkg.sha256` checksum. To package an existing build, use `bash scripts/package.sh --skip-build`.
+
+### Source map
+
 | Path | Responsibility |
 | --- | --- |
 | [`Sources/`](Sources/) | Native app lifecycle, settings, system observers, and desktop windows. |
@@ -151,6 +159,7 @@ The app also listens for sleep, display sleep, and session changes to pause and 
 | [`Web/wallpaper.css`](Web/wallpaper.css) | Shared web palette and canvas styling. |
 | [`Tests/`](Tests/) | Simulation checks and a real WKWebView smoke harness. |
 | [`scripts/`](scripts/) | App builds, icon generation, tests, and macOS packaging. |
+| [`media/readme/`](media/readme/) | Reproducible Remotion desktop demo; its dependencies are separate from the app. |
 
 ### Run the checks
 
@@ -162,7 +171,7 @@ bun run test:web
 bash scripts/test.sh
 ```
 
-The five simulation tests cover head stability, joint lengths across all eight supported shark shapes, sustained swimming, solo visibility, and resizing. The native harness checks resource loading, animation, pause/resume, frame-rate configuration, scene replacement, hiding, desktop window properties, language persistence, menu actions, and live accessibility localization. It briefly opens a test window and saves `build/native-smoke-report.json` and `build/native-preview.png`.
+The simulation tests cover head stability, joint lengths across all eight supported shark shapes, sustained swimming, solo visibility, resizing, pointer response, water-mark bounds and expiry, and one-at-a-time curiosity. The native harness checks resource loading, animation, pause/resume, frame-rate configuration, scene replacement, hiding, desktop window properties, language and interaction preferences, native pointer bridging, display coordinate mapping, menu actions, and live accessibility localization. It briefly opens a test window and saves `build/native-smoke-report.json` and `build/native-preview.png`.
 
 <details>
 <summary>When the terminal cannot access macOS graphical services</summary>
@@ -216,7 +225,7 @@ The [validation log](docs/VALIDATION.md) records passing builds and native WebKi
 <details>
 <summary><strong>What is outside the current scope?</strong></summary>
 
-This is an early, locally built macOS app. Intel Mac builds, launch at login, lock-screen wallpaper, a wallpaper store, pointer interaction, and automatic updates are not currently provided.
+This is an early macOS app, available as a downloadable release or a local build. Intel Mac builds, launch at login, lock-screen wallpaper, a wallpaper store, click-to-feed interaction, and automatic updates are not currently provided.
 
 </details>
 

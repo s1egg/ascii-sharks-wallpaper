@@ -117,3 +117,74 @@ The user then disabled Show Menu Bar Background and reported that the issue was 
 - The installer was rebuilt and fully expanded. Its checks confirmed both localization bundles, the English development region, English installer pages, installation location, architecture, and app signature.
 
 Evidence: `build/native-smoke-report.json` and `build/native-preview.png`.
+
+## 2026-11-03: Gentle pointer interaction preview
+
+- Added velocity-sensitive fish avoidance, up to three fading character water marks, and a single nearby shark's brief curiosity after approximately two seconds of stillness. Visits release on movement and do not repeat for a parked pointer.
+- The native menu includes a persisted, bilingual interaction toggle. Desktop windows remain click-through and cannot take keyboard focus. Pointer sampling is requested by the existing render loop, without a native polling timer or event tap.
+- `bash scripts/test.sh` passed after the final change: all ten simulation tests, the real WKWebView/native harness, app compilation, and ad hoc signature verification.
+- New simulation checks cover entry without a splash, velocity-dependent local avoidance, bounded/expiring marks, one visitor, interrupted and expired visits, and hover timing independent of swim speed.
+- Native checks cover the persisted toggle and menu action, normalized pointer delivery, negative-origin portrait coordinates, leaving a display, disabling interaction while swimming continues, and zero pointer samples while paused. Coordinate checks use injected positions; physical multiple-display hot-plug behavior remains a target-environment check.
+- Playwright checks passed at 1440 × 900, 2560 × 1080, and 768 × 1024, across Classic, Mixed, and Solo. Browser input triggered a visit after about 2.02 seconds; movement released it. Pause, Reduce Motion, disabling interaction, invalid coordinates, water-mark expiry, and resize/scene replacement behaved as expected, with no JavaScript errors.
+- Browser testing found an initial ResizeObserver notification clearing freshly received pointer input after scene replacement. The engine now skips unchanged size notifications; the same browser checks passed afterward.
+- Both localization tables passed `plutil -lint`; `git diff --check` and the Impeccable detector reported no findings.
+
+Evidence: `output/playwright/check-interaction.js`, `output/playwright/interactive-{water,curiosity,mixed,solo}.png`, `build/native-smoke-report.json`, and `build/native-preview.png`. The local preview app and ZIP were rebuilt. The installed application in `/Applications` was not replaced or restarted.
+
+## 2026-11-03: Faster curiosity and stronger water feedback
+
+- Reduced the stillness threshold from 2 seconds to 0.6 seconds and accelerated the attraction response. Curious sharks turn more readily and briefly swim up to roughly 1.7 times cruise speed to close the gap, easing down near the pointer.
+- Increased area-based fish density by about 82% (130 to 236 fish at 1440 × 900), capped at 320 animals. Increased fish ink visibility and the velocity-sensitive interaction radius to a maximum of 240 CSS pixels.
+- Increased water marks from three to five, with larger, darker broken-character arcs that fade within 2.2 seconds. The total remains bounded at 90 glyphs.
+- `bash scripts/test.sh` passed all eleven simulation tests, the real native WebKit harness, compilation, and app signature verification. A new trajectory check verifies that curiosity closes the gap faster while keeping segment lengths, speed, and turning bounded; subsecond hover timing passes at all three swim speeds.
+- Browser checks passed in Classic, Mixed, and Solo at 1440 × 900, 2560 × 1080, and 768 × 1024. The measured hover trigger was 0.60 seconds, with no JavaScript errors. Pause, Reduce Motion, interaction disabling, departure, resize, and mark expiry continued to pass.
+- A short 238-frame local sample measured render-callback times of about 1.9 ms median and 3.6 ms P95. This is a local sample, not a long-term power or cross-device performance guarantee.
+- The current in-app preview was reloaded and inspected. Both localization tables, the diff whitespace check, and the Impeccable detector passed.
+
+Evidence: `build/interactive-v2-browser-report.json`, `output/playwright/interactive-v2-{water,curiosity,mixed,solo}.png`, and `build/native-smoke-report.json`.
+
+## 2026-11-03: Ripples only on fish contact
+
+- Removed movement-generated cursor trails. A ripple is emitted only when an actual pointer segment passes within 28 CSS pixels of a live small fish, at the contact location. Empty water, inactive/dead fish, and stationary cursors do not emit new marks.
+- Bounded swept-segment detection catches fast crossings between native samples. Repeated contacts retain the five-mark limit, spacing/cooldown, and 2.2-second expiry; later encounters at the same location still respond.
+- `bash scripts/test.sh` passed thirteen simulation tests, the native WebKit harness, compilation, and signature verification. New checks cover empty water, live versus dead/distant fish, fast crossings, repeat encounters, bounded emission, expiry, and departure.
+- Browser checks recorded zero marks during a clear-water sweep and one mark when crossing the seeded fish school, with no JavaScript errors. The 0.6-second hover response, pause, Reduce Motion, interaction toggle, scene changes, and landscape/portrait coordinates still passed.
+- `git diff --check` and the Impeccable detector passed. The app and ZIP were rebuilt.
+
+Evidence: `build/interactive-contact-browser-report.json`, `output/playwright/interactive-contact-{empty,fish,curiosity,mixed,solo}.png`, and `build/native-smoke-report.json`.
+
+## 2026-11-03: Sparse schools and restored visual hierarchy
+
+- Reduced the initial small-fish population to 24–64 by viewport area, including 54 at 1440 × 900 instead of 236. Schools contain at most seven fish, use wider spacing and weaker cohesion, and no longer mill into dense bait balls.
+- Added persistent school identities, cross-school separation within a species, and small returning groups. Initial groups form loose ribbons with separated centers and consistent depth, preserving open water around the main subjects.
+- Softened resting fish ink and limited the stronger emphasis to pointer proximity. Contact-only ripples and the 0.6-second curiosity response remain active.
+- Long-run checks exposed a wide corner turn that could take the solo shark out of view with the new prey distribution. Boundary anticipation now smoothly tightens the turning radius near threatened edges while retaining the existing angular-speed limits and articulation.
+- `bash scripts/test.sh` passed all fifteen simulation tests, native WebKit/menu checks, compilation, and signature verification. New checks cover bounded group sizes after respawn and greater separation between distinct schools of the same species. The five-minute solo visibility check passed.
+- Browser checks passed in Classic, Mixed, and Solo at 1440 × 900, 2560 × 1080, and 768 × 1024. The report recorded 54 fish, zero empty-water marks, one contact mark, and a 0.60-second hover trigger, with no JavaScript errors.
+- Inspected the three rendered layouts; `git diff --check` and the Impeccable detector passed. The local app and preview ZIP were rebuilt.
+
+Evidence: `build/quiet-browser-report.json`, `output/playwright/quiet-{classic,empty,contact,curiosity,mixed,solo}.png`, and `build/native-smoke-report.json`.
+
+## 2026-11-03: Species personalities and occasional ocean moments
+
+- Hammerheads favor a horizontal patrol lane; makos make smooth three-second bursts when their projected route is clear; threshers cruise, turn, and beat their tails more slowly. The Mixed scene now includes a thresher alongside hammerhead, tiger, and mako residents, with a localized menu hint.
+- At 1× simulation speed, the first ambient opportunity is after 55–85 seconds. Events alternate between guiding an existing small school through the center and one distant, temporary visitor. Completed events leave 90–150 seconds of quiet; pointer play, curiosity, and bursts postpone new events.
+- School crossings preserve the fish budget. Visitors use absent species where possible, do not interact with foreground predators/pointer input, and fade with pale ink before cleanup. They use the same articulated spine without allocating persistent wake entries. Resize preserves their geometry and adjusts remaining travel time.
+- `bash scripts/test.sh` passed twenty simulation tests, real WKWebView/menu checks, compilation, and app signature verification. New checks cover horizontal patrol, slower thresher turns/tail rhythm, brief separated mako bursts and recovery, fifteen simulated minutes of bounded event lifecycles, visitor resizing/removal, and deferral during pointer play.
+- In a separate ten-minute Mixed simulation, the scene was never completely empty; resident identities and the sparse fish budget were preserved. Individual animals can briefly swim beyond an edge during turns.
+- Playwright verified the production `?scene=mixed` preview contains all requested species, and that pause freezes simulation and ambient counters. Separate rendering fixtures used the real World and AsciiRenderer to advance to a center crossing and a visible distant visitor. Both captures preserved four residents and 54 small fish, with no JavaScript errors.
+- The inspected Mixed, crossing, and visitor captures retained the warm paper, open composition, and character-based silhouettes. Updated the Mixed README image and both language descriptions.
+- Both localization tables passed `plutil -lint`; `git diff --check` and the Impeccable detector passed. The local app and preview ZIP were rebuilt.
+
+Evidence: `build/personality-browser-report.json`, `output/playwright/personality-mixed.png`, `output/playwright/moment-{crossing,visitor}.png`, and `build/native-smoke-report.json`. The event render fixture lives under ignored build/output directories and is not included in the application.
+
+## 2026-11-03: 0.1.2 release preparation
+
+- Prepared version 0.1.2 with bundle build number 3, a changelog, bilingual release notes, and a documented local release command.
+- An independent pre-release review found two issues: a paused canvas could retain old pointer marks, and reused build directories could carry stale resources into a new app. Both were fixed and the review passed on recheck.
+- The native harness now verifies that pausing paints exactly one clean static frame without advancing simulation time. All twenty simulation tests and the native WebKit/menu harness passed.
+- App and icon assembly now use empty staging directories. A build with harmless sentinel files planted in the old Web cache and old app bundle confirmed that neither file entered the rebuilt signed app or ZIP.
+- Negative checks confirmed that local release assembly rejects a dirty source tree and that the app build rejects mismatched manifest/plist versions.
+- Rebuilt the arm64 ZIP and PKG as 0.1.2; package expansion, payload, localization, and signature checks passed.
+- Regenerated the README's MP4/GIF from the current sparse ocean and refreshed scene previews. Shared-memory capture on the tested installed Chrome corrupted the first two MP4 frames; ordinary PNG frame capture resolved it. The frame check then passed all 300 MP4 frames and 150 GIF frames with no missing Dock frames.
+- The post-commit release command records the exact commit/tree, toolchain, signing status, artifact hashes, and fresh verification results in `dist/releases/0.1.2/release.json`.
