@@ -1,0 +1,11 @@
+:root {
+  color-scheme: light;
+  --water-paper: #eee9df;
+  --water-ink: #3e4943;
+  --water-mist: #a8b8ac;
+  --water-clay: #b8a58c;
+  --water-light: #faf6ed;
+  background: var(--water-paper);
+}
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--water-paper); }
+canvas { display: block; width: 100%; height: 100%; font-family: Menlo, Monaco, ui-monospace, monospace; }

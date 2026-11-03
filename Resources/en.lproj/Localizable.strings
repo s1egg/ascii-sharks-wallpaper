@@ -1,0 +1,46 @@
+/* Menu actions and preferences. */
+"menu.pause" = "Pause Animation";
+"menu.resume" = "Resume Animation";
+"menu.show" = "Show Wallpaper";
+"menu.hide" = "Hide Wallpaper";
+"menu.scene" = "Scene";
+"menu.frameRate" = "Frame Rate";
+"menu.speed" = "Swim Speed";
+"menu.displays" = "Displays";
+"menu.language" = "Language";
+"menu.reload" = "Reload Wallpaper";
+"menu.error" = "View Error…";
+"menu.about" = "About ASCII Sharks Wallpaper…";
+"menu.quit" = "Quit ASCII Sharks Wallpaper";
+"scene.classic" = "Classic · 4 sharks";
+"scene.mixed" = "Mixed · 4 sharks";
+"scene.solo" = "Solo · 1 shark";
+"frameRate.low" = "15 FPS · Low Power";
+"frameRate.balanced" = "30 FPS · Balanced";
+"frameRate.smooth" = "60 FPS · Smooth";
+"frameRate.limited" = "Power Saving: 15 FPS Max";
+"speed.slow" = "0.5× · Slow";
+"speed.natural" = "1× · Natural";
+"speed.lively" = "1.5× · Lively";
+"displays.all" = "All Displays";
+"displays.primary" = "Primary Display Only";
+
+/* Status text describes the effective state, not just the saved preference. */
+"status.playing" = "Playing · %d FPS";
+"status.savingPower" = "Saving Energy · %d FPS";
+"status.hidden" = "Wallpaper Hidden";
+"status.paused" = "Animation Paused";
+"status.suspended" = "Paused by macOS";
+"status.loading" = "Preparing the Ocean…";
+"status.reducedMotion" = "Still · Reduce Motion Is On";
+"status.failed" = "Wallpaper Could Not Load";
+"accessibility.menu" = "ASCII Sharks Wallpaper controls";
+
+/* Alerts and recovery instructions. */
+"error.title" = "Wallpaper Could Not Load";
+"error.missingResources" = "The animation files are missing. Rebuild or reinstall ASCII Sharks Wallpaper.";
+"error.loadingFailed" = "The animation could not load. Choose Reload Wallpaper from the menu to try again.";
+"error.rendererStopped" = "The animation process stopped. Choose Reload Wallpaper from the menu to try again.";
+"error.details" = "The wallpaper encountered an error. Choose Reload Wallpaper to try again.\n\nTechnical details:\n%@";
+"alert.ok" = "OK";
+"about.description" = "%@ · Apple Silicon · macOS 13+\n\nA quiet ocean, drawn in characters.\n\nBased on stackedlol/ascii-sharks (MIT).\nhttps://github.com/stackedlol/ascii-sharks\n\nRuns entirely offline. Low Power Mode or serious thermal pressure limits rendering to 15 FPS. Respects macOS Reduce Motion.\n\nQuitting reveals your current system wallpaper.";

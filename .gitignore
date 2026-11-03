@@ -1,0 +1,56 @@
+# macOS metadata
+.DS_Store
+.AppleDouble
+._*
+
+# Build and distribution output
+/build/
+/dist/
+.build/
+/DerivedData/
+*.dSYM/
+
+# Xcode and SwiftPM user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+.swiftpm/xcode/
+
+# JavaScript dependencies, caches, and coverage
+node_modules/
+.bun/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Local tooling, generated previews, and test reports
+.gstack/
+.playwright-cli/
+.skill-archive/
+/output/
+/playwright-report/
+/test-results/
+
+# Logs and temporary editor files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+.idea/
+*.swp
+*.swo
+*~
+
+# Local environment and signing credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.*.sample
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile

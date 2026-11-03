@@ -1,0 +1,46 @@
+/* Menu actions and preferences. */
+"menu.pause" = "暂停动画";
+"menu.resume" = "继续动画";
+"menu.show" = "显示壁纸";
+"menu.hide" = "隐藏壁纸";
+"menu.scene" = "海洋场景";
+"menu.frameRate" = "帧率";
+"menu.speed" = "游动速度";
+"menu.displays" = "显示器";
+"menu.language" = "语言";
+"menu.reload" = "重新加载壁纸";
+"menu.error" = "查看错误…";
+"menu.about" = "关于 ASCII Sharks Wallpaper…";
+"menu.quit" = "退出 ASCII Sharks Wallpaper";
+"scene.classic" = "经典鲨群 · 4 条";
+"scene.mixed" = "混合物种 · 4 条";
+"scene.solo" = "独游 · 1 条";
+"frameRate.low" = "15 FPS · 节能";
+"frameRate.balanced" = "30 FPS · 均衡";
+"frameRate.smooth" = "60 FPS · 流畅";
+"frameRate.limited" = "节能模式：最高 15 FPS";
+"speed.slow" = "0.5× · 慢游";
+"speed.natural" = "1× · 自然";
+"speed.lively" = "1.5× · 轻快";
+"displays.all" = "所有显示器";
+"displays.primary" = "仅主显示器";
+
+/* Status text describes the effective state, not just the saved preference. */
+"status.playing" = "正在游动 · %d FPS";
+"status.savingPower" = "节能运行 · %d FPS";
+"status.hidden" = "壁纸已隐藏";
+"status.paused" = "动画已暂停";
+"status.suspended" = "系统休息中 · 自动暂停";
+"status.loading" = "正在准备海洋…";
+"status.reducedMotion" = "静态画面 · 已开启减少动态效果";
+"status.failed" = "壁纸加载失败";
+"accessibility.menu" = "ASCII Sharks Wallpaper 控制菜单";
+
+/* Alerts and recovery instructions. */
+"error.title" = "壁纸加载失败";
+"error.missingResources" = "找不到动画资源。请重新构建或安装 ASCII Sharks Wallpaper。";
+"error.loadingFailed" = "动画无法加载。请从菜单选择“重新加载壁纸”后重试。";
+"error.rendererStopped" = "动画进程已停止。请从菜单选择“重新加载壁纸”后重试。";
+"error.details" = "壁纸运行遇到问题。请选择“重新加载壁纸”后重试。\n\n技术详情：\n%@";
+"alert.ok" = "好";
+"about.description" = "%@ · Apple Silicon · macOS 13+\n\n用字符，画一片安静的海。\n\n基于 stackedlol/ascii-sharks（MIT）。\nhttps://github.com/stackedlol/ascii-sharks\n\n完全离线运行。低电量模式或系统高温时，帧率上限降至 15 FPS；遵循系统“减少动态效果”设置。\n\n退出应用后会露出当前的系统壁纸。";
